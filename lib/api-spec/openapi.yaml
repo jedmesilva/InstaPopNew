@@ -1,0 +1,774 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: pop-person
+    description: PopPerson domain operations
+  - name: access
+    description: Access origin operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /access/location:
+    get:
+      operationId: getAccessLocation
+      tags: [access]
+      summary: Resolve the approximate origin of the current access
+      description: Returns an approximate city, region, and country based on the request IP.
+      responses:
+        "200":
+          description: Approximate access location
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessLocation"
+  /access/location/search:
+    get:
+      operationId: searchCities
+      tags: [access]
+      summary: Search cities and their administrative regions
+      description: Returns cities matching a search term, including the corresponding region and country.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 80
+      responses:
+        "200":
+          description: Matching cities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CitySearchResponse"
+        "400":
+          description: Invalid search query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Geocoding service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /access/countries/search:
+    get:
+      operationId: searchCountries
+      tags: [access]
+      summary: Search countries by localized name or code
+      description: Returns countries matching names, translations, aliases, or ISO codes.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 80
+      responses:
+        "200":
+          description: Matching countries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CountrySearchResponse"
+        "400":
+          description: Invalid search query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Country catalog unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /pop-person:
+    get:
+      operationId: getPopPerson
+      tags: [pop-person]
+      summary: Get PopPerson configuration and state
+      responses:
+        "200":
+          description: PopPerson bootstrap data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PopPersonBootstrap"
+  /pop-person/player:
+    post:
+      operationId: joinPopPersonAsPlayer
+      tags: [pop-person]
+      summary: Add the authenticated user as a player
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinPopPersonBody"
+      responses:
+        "201":
+          description: Player cell created or restored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinPopPersonResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /pop-person/player/registration:
+    get:
+      operationId: getPlayerRegistration
+      tags: [pop-person]
+      summary: Get authenticated player registration defaults
+      responses:
+        "200":
+          description: Registration data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerRegistration"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /auth/x/start:
+    get:
+      operationId: startXAuthentication
+      tags: [auth]
+      summary: Start X OAuth authentication
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirects to X authorization.
+        "503":
+          description: X authentication is not configured.
+  /auth/x/callback:
+    get:
+      operationId: completeXAuthentication
+      tags: [auth]
+      summary: Complete X OAuth authentication
+      responses:
+        "303":
+          description: Redirects back to the app.
+  /auth/me:
+    get:
+      operationId: getAuthenticatedUser
+      tags: [auth]
+      summary: Get the authenticated X user
+      responses:
+        "200":
+          description: Current authenticated user, if any.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user:
+                    oneOf:
+                      - $ref: "#/components/schemas/AuthenticatedUser"
+                      - type: "null"
+  /auth/logout:
+    post:
+      operationId: logoutAuthenticatedUser
+      tags: [auth]
+      summary: Clear the authenticated X session
+      responses:
+        "204":
+          description: Session cleared.
+  /pop-person/state:
+    get:
+      operationId: getPopPersonState
+      tags: [pop-person]
+      summary: Get the current PopPerson state
+      responses:
+        "200":
+          description: Current dataset and active actions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PopPersonState"
+  /pop-person/payments/{checkoutSessionId}:
+    get:
+      operationId: getPopPersonPaymentStatus
+      tags: [pop-person]
+      summary: Get the status of a PopPerson payment and its action
+      parameters:
+        - name: checkoutSessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payment status and created action, when available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PopPersonPaymentStatus"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Payment order not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /pop-person/actions:
+    post:
+      operationId: createPopPersonAction
+      tags: [pop-person]
+      summary: Create a Stripe payment intent for an attack or defense action
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PopPersonActionInput"
+      responses:
+        "201":
+          description: Queued action
+          content:
+            application/json:
+              schema:
+                 $ref: "#/components/schemas/PopPersonCheckout"
+        "400":
+          description: Invalid action
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    AccessLocation:
+      type: object
+      required: [source, city, region, regionCode, country, countryCode, timezone]
+      properties:
+        source:
+          type: string
+          enum: [ip, local, unavailable]
+        city:
+          type: string
+        region:
+          type: string
+        regionCode:
+          type: string
+        country:
+          type: string
+        countryCode:
+          type: string
+        timezone:
+          type: string
+    CitySearchResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/CitySearchResult"
+    CountrySearchResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/CountrySearchResult"
+    CountrySearchResult:
+      type: object
+      required: [code2, code3, name, nameEnglish]
+      properties:
+        code2:
+          type: string
+        code3:
+          type: string
+        name:
+          type: string
+        nameEnglish:
+          type: string
+    CitySearchResult:
+      type: object
+      required: [id, city, region, country, countryCode, latitude, longitude]
+      properties:
+        id:
+          type: string
+        city:
+          type: string
+        region:
+          type: string
+        country:
+          type: string
+        countryCode:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+    PopPerson:
+      type: object
+      required: [name, category, categoryPath, gender, cidade, estado, estadoCodigo, pais, paisCodigo, status, value, color, basePrice, totalFans, totalHaters, polarization, imageUrl, xUsername, xProfileUrl]
+      properties:
+        name:
+          type: string
+        category:
+          $ref: "#/components/schemas/PopPersonCategory"
+        categoryPath:
+          type: array
+          items:
+            $ref: "#/components/schemas/PopPersonCategory"
+        gender:
+          type: ["string", "null"]
+          description: Gender recorded for the person, when known.
+        cidade:
+          type: string
+        estado:
+          type: string
+        estadoCodigo:
+          type: string
+        pais:
+          type: string
+        paisCodigo:
+          type: string
+        status:
+          type: string
+          enum: [titular, candidato]
+        value:
+          type: number
+        color:
+          type: string
+        basePrice:
+          type: number
+          minimum: 0
+          description: Current target-specific base price calculated from net popularity.
+        totalFans:
+          type: number
+          minimum: 0
+          description: Number of completed fan actions for this person.
+        totalHaters:
+          type: number
+          minimum: 0
+          description: Number of completed hater actions for this person.
+        polarization:
+          type: ["number", "null"]
+          minimum: 0
+          maximum: 1
+          description: Polarization from 0 to 1, or null when there are no completed actions.
+        imageUrl:
+          type: ["string", "null"]
+          description: Optional person image URL. The client keeps the cell color as the fallback background.
+        xUsername:
+          type: ["string", "null"]
+          description: X username for a player-linked profile, without the @ prefix.
+        xProfileUrl:
+          type: ["string", "null"]
+          description: Public X profile URL for a player-linked profile.
+    PopPersonCategory:
+      type: object
+      required: [id, name, slug, parentId]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        parentId:
+          type: ["string", "null"]
+    PopPersonElement:
+      type: object
+      required: [id, emoji, imageUrl, label, description, force, price, gender]
+      properties:
+        id:
+          type: string
+        emoji:
+          type: string
+        imageUrl:
+          type: ["string", "null"]
+          description: Optional item image URL. The client can fall back to emoji when absent.
+        label:
+          type: string
+        description:
+          type: ["string", "null"]
+          description: Optional item description.
+        force:
+          type: number
+        price:
+          type: number
+        gender:
+          type: string
+          enum: [m, f]
+    PopPersonLevel:
+      type: object
+      required: [key, actionType, name, emoji, multiplier, startDelayMs, staggerMs, duration, growthPerHit, impactMultiplier, shake]
+      properties:
+        key:
+          type: string
+        actionType:
+          type: string
+          enum: [hate, fan]
+        name:
+          type: string
+        emoji:
+          type: string
+        multiplier:
+          type: number
+          minimum: 1
+        startDelayMs:
+          type: number
+          minimum: 0
+        staggerMs:
+          type: number
+          minimum: 0
+        duration:
+          type: number
+          minimum: 0
+        growthPerHit:
+          type: number
+        impactMultiplier:
+          type: number
+        shake:
+          type: boolean
+    PopPersonActionType:
+      type: object
+      required: [key, label, basePriceCurrent, basePriceMinimum]
+      properties:
+        key:
+          type: string
+          enum: [hate, fan]
+        label:
+          type: string
+        basePriceCurrent:
+          type: number
+          minimum: 0
+        basePriceMinimum:
+          type: number
+          minimum: 0
+    PopPersonConfig:
+      type: object
+      required: [actionTypes, levels]
+      properties:
+        actionTypes:
+          type: object
+          required: [hate, fan]
+          properties:
+            hate:
+              $ref: "#/components/schemas/PopPersonActionType"
+            fan:
+              $ref: "#/components/schemas/PopPersonActionType"
+        levels:
+          type: array
+          items:
+            $ref: "#/components/schemas/PopPersonLevel"
+    PopPersonAction:
+      type: object
+      required: [id, mode, actionType, level, levelName, levelEmoji, multiplier, targetName, sourceName, status, startDelayMs, executeAt, completesAt, startedAt, completedAt, hitCount, lastHitAt, count, growthPerHit, impactMultiplier, staggerMs, duration, price, shake]
+      properties:
+        id:
+          type: string
+        mode:
+          type: string
+          enum: [atacar, defender]
+        actionType:
+          type: string
+          enum: [hate, fan]
+        level:
+          type: string
+        levelName:
+          type: string
+        levelEmoji:
+          type: string
+        multiplier:
+          type: number
+          minimum: 1
+        startDelayMs:
+          type: number
+          minimum: 0
+        targetName:
+          type: string
+        sourceName:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [queued, running, completed]
+        executeAt:
+          type: number
+          minimum: 0
+        completesAt:
+          type: number
+          minimum: 0
+        startedAt:
+          type: ["number", "null"]
+          minimum: 0
+        completedAt:
+          type: ["number", "null"]
+          minimum: 0
+        hitCount:
+          type: number
+          minimum: 0
+        lastHitAt:
+          type: ["number", "null"]
+          minimum: 0
+        count:
+          type: number
+          minimum: 1
+        growthPerHit:
+          type: number
+        impactMultiplier:
+          type: number
+        staggerMs:
+          type: number
+          minimum: 0
+        duration:
+          type: number
+          minimum: 0
+        price:
+          type: number
+          minimum: 0
+        shake:
+          type: boolean
+    PopPersonState:
+      type: object
+      required: [stateVersion, dataset, actions]
+      properties:
+        stateVersion:
+          type: number
+          minimum: 0
+          description: Monotonic room version used to reject stale realtime snapshots.
+        dataset:
+          type: array
+          items:
+            $ref: "#/components/schemas/PopPerson"
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PopPersonAction"
+    PopPersonCheckout:
+      type: object
+      required: [paymentOrderId, paymentIntentId, clientSecret, publishableKey, amount, currency]
+      properties:
+        paymentOrderId:
+          type: string
+        paymentIntentId:
+          type: string
+        clientSecret:
+          type: string
+        publishableKey:
+          type: string
+        amount:
+          type: number
+          minimum: 0
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+    PopPersonPaymentStatus:
+      type: object
+      required: [status, actionId, action, replay]
+      properties:
+        status:
+          type: string
+          enum: [pending, paid, failed, expired, cancelled]
+        actionId:
+          type: ["string", "null"]
+        action:
+          oneOf:
+            - $ref: "#/components/schemas/PopPersonAction"
+            - type: "null"
+        replay:
+          description: Visual replay data for a completed paid action.
+          oneOf:
+            - type: object
+              required: [targetName, previousValue, finalValue, delta, hitCount, durationMs, intervalMs]
+              properties:
+                targetName:
+                  type: string
+                previousValue:
+                  type: number
+                finalValue:
+                  type: number
+                delta:
+                  type: number
+                hitCount:
+                  type: number
+                  minimum: 1
+                durationMs:
+                  type: number
+                  minimum: 0
+                intervalMs:
+                  type: number
+                  minimum: 0
+            - type: "null"
+    PopPersonBootstrap:
+      type: object
+      required: [config, state, user, player]
+      properties:
+        config:
+          $ref: "#/components/schemas/PopPersonConfig"
+        state:
+          $ref: "#/components/schemas/PopPersonState"
+        user:
+          oneOf:
+            - $ref: "#/components/schemas/AuthenticatedUser"
+            - type: "null"
+        player:
+          $ref: "#/components/schemas/PlayerMembership"
+    PlayerMembership:
+      type: object
+      required: [isPlayer, name]
+      properties:
+        isPlayer:
+          type: boolean
+        name:
+          type: ["string", "null"]
+    JoinPopPersonResponse:
+      type: object
+      required: [player]
+      properties:
+        player:
+          $ref: "#/components/schemas/PopPerson"
+    JoinPopPersonBody:
+      type: object
+      required: [categoryId, location, termsAccepted]
+      properties:
+        categoryId:
+          type: string
+          minLength: 1
+        location:
+          $ref: "#/components/schemas/PlayerRegistrationLocation"
+        termsAccepted:
+          type: boolean
+          description: Whether the user accepted the InstaPop Terms and Conditions.
+    PlayerRegistrationLocation:
+      type: object
+      required: [city, region, country]
+      properties:
+        city:
+          type: string
+          minLength: 1
+        region:
+          type: string
+          minLength: 1
+        country:
+          type: string
+          minLength: 1
+    PlayerRegistration:
+      type: object
+      required: [user, categories, defaultCategoryId]
+      properties:
+        user:
+          $ref: "#/components/schemas/PlayerRegistrationUser"
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/PopPersonCategory"
+        defaultCategoryId:
+          type: ["string", "null"]
+    PlayerRegistrationUser:
+      type: object
+      required: [xUserId, username, name, avatarUrl, email]
+      properties:
+        xUserId:
+          type: string
+        username:
+          type: string
+        name:
+          type: string
+        avatarUrl:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+    AuthenticatedUser:
+      type: object
+      required: [xUserId, username, name, xLocation, avatarUrl, email, createdAt]
+      properties:
+        xUserId:
+          type: string
+        username:
+          type: string
+        name:
+          type: string
+        xLocation:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+    PopPersonActionInput:
+      type: object
+      required: [actionType, level, targetName]
+      properties:
+        actionType:
+          type: string
+          enum: [hate, fan]
+        level:
+          type: string
+          minLength: 1
+        targetName:
+          type: string
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 160
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
